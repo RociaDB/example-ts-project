@@ -109,9 +109,9 @@ export interface StockMove {
 /**
  * VAT on a net amount, rounded to the nearest cent.
  *
- * `Math.trunc` and not `Math.round`: the addition of half a cent already
- * carries the rounding, and dividing two integers in JavaScript yields a
- * fraction where Rust's `i64 / i64` would have truncated on its own.
+ * Adding half a cent before the division is what does the rounding, so the
+ * division itself must only drop the remainder — hence `Math.trunc` and not
+ * `Math.round`, which would round a second time.
  */
 export function vat(net: Cents, rate: number): Cents {
   return Math.trunc((net * rate + 5_000) / 10_000);

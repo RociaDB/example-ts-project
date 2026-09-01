@@ -9,11 +9,6 @@
  * | `uploadFileStream` | re-chunks a source, checks the declared total | the source is a stream and you know size and hash up front |
  * | `uploadFileRaw` | nothing | you build every message yourself |
  *
- * **Do not port these by name from the Rust SDK.** The middle tier is
- * `uploadFileStream` here and `upload_file_chunked` there; the raw escape
- * hatch is `uploadFileRaw` here and `upload_file_stream` there. The two names
- * that look alike are the two that are *not* each other's counterpart.
- *
  * The wire contract the first two honour for you: the **first** message
  * carries the metadata (tenant, bucket, file id, `sizeBytes`, `contentType`,
  * `checksum`, `requestId`); later messages are read only for their `chunk`;

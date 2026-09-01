@@ -7,11 +7,6 @@ the RociaDB TypeScript SDK.
 The business logic is deliberately plain. The point is to use every part of
 the SDK once, at the place where it is the right tool.
 
-This is the TypeScript twin of
-[`example-rust-project`](https://github.com/RociaDB/example-rust-project): same
-ERP, same eight steps, same output. Where the two differ, the difference is
-the language's, not the example's — and each one is called out below.
-
 ## Running it
 
 ```bash
@@ -69,10 +64,9 @@ Six files, one per SDK service area plus the context they share:
 | [`files.ts`](src/files.ts) | the three uploads, the two downloads, the wire contract |
 | [`main.ts`](src/main.ts) | the builder, tenants, token lifecycle, error handling, the demo |
 
-Rust keeps `erp.ts`'s contents in `main.rs` and reaches them through
-`crate::`. TypeScript has no crate root, so doing the same would make every
-module import from the entry point and back; the shared context gets its own
-module instead, and nothing imports `main.ts`.
+`erp.ts` exists so that nothing imports `main.ts`: the four service modules all
+need the client and the tenant, and `main.ts` imports all four, so holding that
+context in the entry point would put a cycle through every one of them.
 
 Money is stored in cents and VAT rates in basis points, so no rounding
 depends on the order of operations. Cents are a plain `number`: every
@@ -123,13 +117,12 @@ lacks the scope). Everything else is in `kind` and `reason`.
 
 ## Things worth knowing in TypeScript
 
-**Close the client — not to exit, but to release it.** Rust releases the
-connection by dropping the last clone; here it is an explicit `client.close()`,
-in a `finally` block, tearing down the four gRPC channels and the cached
-token. It is not what lets the process exit: grpc-js keeps an idle session
-unref'd, so a program that forgot the call would still terminate. That is
-precisely why a long-lived service has to remember it — nothing will remind
-you.
+**Close the client — not to exit, but to release it.** `client.close()` tears
+down the four gRPC channels and the cached token, and belongs in a `finally`
+so a failed step still gives them up. It is not what lets the process exit:
+grpc-js keeps an idle session unref'd, so a program that forgets the call
+still terminates. That is precisely why a long-lived service has to remember
+it — nothing will remind you.
 
 **Counts and sizes are `bigint`.** `totalCount`, `CollectionInfo.count`,
 `FileMetadata.sizeBytes` and `FileStreamUpload.sizeBytes` are protobuf
@@ -156,19 +149,13 @@ all: with only `eq`, `in` and `contains` there is no comparing two fields, so
 **`RociaDbError` is one class with a `kind` field**, so an
 `instanceof RociaDbError` check never breaks when a cause is added, and
 `switch (error.kind)` over the six kinds is checked exhaustively by `tsc`.
-Rust's enum is `#[non_exhaustive]` and forces a wildcard arm; here a seventh
-kind would be a compile error instead. Same safety, opposite direction.
+Leaving the `default` arm off is deliberate: a seventh kind would then be a
+compile error rather than a silent fall-through.
 
 **`@grpc/grpc-js` is a direct dependency on purpose.** The example imports
 `status` from it to name a gRPC code, so it declares the package rather than
-reaching through the SDK's own copy — pinned to the same major version the SDK
-depends on, the way the Rust example pins `reqwest`.
-
-**Do not port upload calls between the two SDKs by name.** The assisted
-streaming tier is `uploadFileStream` here and `upload_file_chunked` in Rust;
-the raw escape hatch is `uploadFileRaw` here and `upload_file_stream` there.
-The two names that look alike are the two that are *not* each other's
-counterpart. [`files.ts`](src/files.ts) says so at the top, next to the calls.
+reaching through the SDK's own copy, pinned to the same major version the SDK
+depends on.
 
 ## Development
 

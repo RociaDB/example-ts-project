@@ -2,10 +2,9 @@
  * The shared context every module needs: the client, the tenant, and the
  * prefix that makes idempotency keys unique per run.
  *
- * Rust keeps this in `main.rs` and reaches it through `crate::`. TypeScript
- * has no crate root, so putting it in `main.ts` would make every module import
- * from the entry point and back — a cycle that ESM resolves only by accident
- * of evaluation order. One small module instead, imported by all four others.
+ * It lives in its own module because the four service modules all need it and
+ * `main.ts` imports all four: holding it there would make each of them import
+ * the entry point back, and a cycle that ESM resolves only by evaluation order.
  */
 
 import type { RociaDbClient } from "@rocia/rociadb-sdk";

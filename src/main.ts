@@ -83,11 +83,10 @@ async function main(): Promise<void> {
   } catch (error) {
     fail(error);
   } finally {
-    // Rust releases the connection by dropping the last clone; here it is an
-    // explicit call, which is why it is in a `finally`. It tears down the four
-    // gRPC channels and the cached token. Note what it is *not*: what lets the
-    // process exit. grpc-js keeps an idle session unref'd, so a demo that
-    // forgot this line would still terminate — which is exactly why a
+    // Release the four gRPC channels and the cached token, in a `finally` so
+    // a failed step still gives them up. Note what this is *not*: what lets
+    // the process exit. grpc-js keeps an idle session unref'd, so forgetting
+    // the call still terminates the program — which is exactly why a
     // long-lived service has to remember it, since nothing will remind you.
     client.close();
   }
@@ -530,10 +529,11 @@ async function authModuleDemo(
   const manager = new TokenManager({ tokenUrl, clientId, clientSecret });
   await manager.initialize();
 
-  // Where Rust spawns a background refresh task and hands you a `#[must_use]`
-  // guard, `metadata()` does the checking inline: every call compares the
-  // cached token's age against `refreshSkewMs` (30 s by default) and renews
-  // if it is close to expiry. Nothing to spawn, nothing to hold.
+  // The gRPC metadata carrying the bearer header, ready to attach to a call
+  // of your own. Renewal happens here rather than in a background task: every
+  // `metadata()` compares the cached token's age against `refreshSkewMs` (30 s
+  // by default) and refetches inline if it is close to expiry, so there is
+  // nothing to spawn and nothing to keep alive.
   const metadata = await manager.metadata();
   const header = String(metadata.get("authorization")[0] ?? "");
 
@@ -592,10 +592,9 @@ async function showErrorHandling(erp: Erp): Promise<void> {
  * One line of guidance per error kind.
  *
  * `RociaDbErrorKind` is a closed union of six strings, so `tsc` proves this
- * switch exhaustive and no default arm is needed. Where Rust's enum is
- * `#[non_exhaustive]` and forces a wildcard arm, a seventh kind added here
- * would be a compile error rather than a silent fall-through — the same
- * safety, arriving from the opposite direction.
+ * switch exhaustive and no default arm is needed. Leaving the default off is
+ * the point: if the SDK ever adds a seventh kind, this stops compiling instead
+ * of silently falling through to generic advice.
  */
 function advice(error: RociaDbError): string {
   switch (error.kind) {
