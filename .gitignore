@@ -1,0 +1,15 @@
+# Dependencies
+node_modules
+
+# Build output
+dist
+*.tsbuildinfo
+
+# Logs
+npm-debug.log*
+
+# Credentials: AUTH_TOKEN_URL / AUTH_CLIENT_ID / AUTH_CLIENT_SECRET
+.env
+
+# macOS
+.DS_Store

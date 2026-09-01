@@ -1,0 +1,26 @@
+{
+  "name": "erp-example",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Small ERP example (quotes, orders, invoices, stock) built on the RociaDB TypeScript SDK",
+  "license": "Apache-2.0",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "npm run build && node dist/main.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "npm run build && node --test dist/*.test.js",
+    "check": "npm run typecheck && npm test"
+  },
+  "dependencies": {
+    "@rocia/rociadb-sdk": "1.0.0",
+    "@grpc/grpc-js": "^1.14.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^5.9.0"
+  }
+}
