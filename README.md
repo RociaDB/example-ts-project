@@ -123,11 +123,13 @@ lacks the scope). Everything else is in `kind` and `reason`.
 
 ## Things worth knowing in TypeScript
 
-**Close the client, or the process hangs.** Rust releases the connection by
-dropping the last clone; here it is an explicit `client.close()`, and it is in
-a `finally` block. Skipping it does more than leak: the open gRPC channels
-keep Node's event loop alive, so the program prints `Done.` and then sits
-there.
+**Close the client — not to exit, but to release it.** Rust releases the
+connection by dropping the last clone; here it is an explicit `client.close()`,
+in a `finally` block, tearing down the four gRPC channels and the cached
+token. It is not what lets the process exit: grpc-js keeps an idle session
+unref'd, so a program that forgot the call would still terminate. That is
+precisely why a long-lived service has to remember it — nothing will remind
+you.
 
 **Counts and sizes are `bigint`.** `totalCount`, `CollectionInfo.count`,
 `FileMetadata.sizeBytes` and `FileStreamUpload.sizeBytes` are protobuf
@@ -143,11 +145,13 @@ them for display.
 the JSON and hands it back as `T` without validating its shape. Only
 unparseable JSON fails, as a `RociaDbError` of kind `"decode"`.
 
-**Filter fields are the JSON's, so they are camelCase here.** The documents
-this example writes use camelCase keys, which means `queryDocuments` filters
-on `dueDate` and `minStock`, not `due_date`. A filter on a field that does not
-exist matches nothing rather than failing — which is the whole argument for
-keeping the model in one file.
+**Query fields are the stored JSON's, so they are camelCase here.** The
+documents this example writes use camelCase keys, which is why the unpaid
+invoices sort on `dueDate` and not `due_date`. A filter or sort naming a field
+that does not exist matches nothing rather than failing — which is the whole
+argument for keeping the model in one file. `minStock` is not a query field at
+all: with only `eq`, `in` and `contains` there is no comparing two fields, so
+"stock below minimum" is narrowed server-side and compared in the client.
 
 **`RociaDbError` is one class with a `kind` field**, so an
 `instanceof RociaDbError` check never breaks when a cause is added, and

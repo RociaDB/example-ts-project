@@ -12,7 +12,7 @@
  * ```
  */
 
-import { status } from "@grpc/grpc-js";
+import { status, type ServiceError } from "@grpc/grpc-js";
 import {
   RociaDbBuilder,
   RociaDbError,
@@ -83,10 +83,12 @@ async function main(): Promise<void> {
   } catch (error) {
     fail(error);
   } finally {
-    // Rust releases the connection by dropping the last clone. Here it is an
-    // explicit call, and skipping it does more than leak: the open gRPC
-    // channels keep Node's event loop alive, so the process would print
-    // "Done." and then hang instead of exiting.
+    // Rust releases the connection by dropping the last clone; here it is an
+    // explicit call, which is why it is in a `finally`. It tears down the four
+    // gRPC channels and the cached token. Note what it is *not*: what lets the
+    // process exit. grpc-js keeps an idle session unref'd, so a demo that
+    // forgot this line would still terminate — which is exactly why a
+    // long-lived service has to remember it, since nothing will remind you.
     client.close();
   }
 }
@@ -521,8 +523,10 @@ async function authModuleDemo(
   const token = await fetchOAuthToken({ tokenUrl, clientId, clientSecret });
 
   // The manager caches and renews. Construction is synchronous, so the first
-  // token is fetched by `initialize()` — or lazily by the first `metadata()`
-  // call, which is what `RociaDbClient` relies on internally.
+  // token comes from `initialize()` — which is what `build()` already awaited
+  // on our behalf, and why bad credentials fail there rather than at the first
+  // RPC. Standalone, you may skip it and let the first `metadata()` call fetch
+  // lazily instead.
   const manager = new TokenManager({ tokenUrl, clientId, clientSecret });
   await manager.initialize();
 
@@ -568,14 +572,18 @@ async function showErrorHandling(erp: Erp): Promise<void> {
     console.log(`   unauthenticated: ${error.code === status.UNAUTHENTICATED}`);
     console.log(`   permissionDenied: ${error.code === status.PERMISSION_DENIED}`);
 
-    // Four fields, coarse to fine: which category of failure, the gRPC code,
-    // the server's own reason (`not_found`, `invalid_argument`, ...), and the
-    // message, so nothing is lost against calling the generated client
-    // directly.
+    // Five fields, coarse to fine: which category of failure, the gRPC code,
+    // the server's own reason (`not_found`, `invalid_argument`, ...), the
+    // SDK's message — which names the call that failed, not the failure — and
+    // `cause`. On a `"status"` error that cause is the grpc-js `ServiceError`,
+    // and its `details` is the text the server actually sent, so nothing is
+    // lost against calling the generated client directly.
     console.log(`   kind: ${error.kind}`);
     console.log(`   code: ${error.code === undefined ? "(none)" : status[error.code]}`);
     console.log(`   reason: ${error.reason ?? "(none)"}`);
     console.log(`   message: ${error.message}`);
+    const cause = error.cause as ServiceError | undefined;
+    console.log(`   cause.details: ${cause?.details ?? "(none)"}`);
     console.log(`   what to do: ${advice(error)}`);
   }
 }
